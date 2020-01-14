@@ -1,13 +1,20 @@
 package com.paidy.user
 
-import org.scalatra._
+import com.mchange.v2.c3p0.ComboPooledDataSource
 import org.json4s.{DefaultFormats, Formats}
+import org.scalatra._
 import org.scalatra.json._
-import com.mongodb.casbah.Imports._
-
+import slick.jdbc.SQLiteProfile.api._
 import com.paidy.user.domain._
+import com.paidy.{db => paidb}
 
-class UserServlet(mongoColl: MongoCollection) extends ScalatraServlet with JacksonJsonSupport {
+object UserServlet {
+  sealed case class NewUser(userName: String, emailAddress: String, password: String) {
+  }
+}
+
+class UserServlet(val db: Database) extends ScalatraServlet with JacksonJsonSupport {
+  protected implicit def executor = scala.concurrent.ExecutionContext.Implicits.global
 
   // Sets up automatic case class to JSON output serialization, required by          
   // the JValueResult trait.                                                         
@@ -43,7 +50,8 @@ class UserServlet(mongoColl: MongoCollection) extends ScalatraServlet with Jacks
   }
 
   post("/users/signup") {
-    val user = parsedBody.extract[User]
+    println(parsedBody)
+    val user = parsedBody.extract[UserServlet.NewUser]
     user
   }
 
