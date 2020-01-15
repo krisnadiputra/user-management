@@ -17,6 +17,7 @@ libraryDependencies ++= Seq(
   "org.json4s" %% "json4s-native" % "3.6.7",
   "org.json4s" %% "json4s-jackson" % "3.6.7",
   "com.typesafe.slick" %% "slick" % "3.2.3",
+  "org.slf4j" % "slf4j-nop" % "1.6.4",
   "org.xerial" % "sqlite-jdbc" % "3.30.1",
   "org.typelevel" %% "cats-core" % "2.0.0",
   "org.typelevel" %% "cats-kernel" % "2.0.0",

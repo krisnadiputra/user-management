@@ -33,12 +33,15 @@ class UserServlet(val db: Database) extends ScalatraServlet with JacksonJsonSupp
   }
 
   get("/users") {
-    userMap.map
+    db.run(paidb.Tables.users.result)
   }
 
   get("/users/:id") {
+    val id = Integer.parseInt(params("id"))
     println("GET - Customer Id - arg. passed :: " + params("id"))
-    userMap.get(params("id"))
+    // userMap.get(params("id"))
+    val query = paidb.Tables.users.filter(_.id === id)
+    db.run(query.result)
   }
 
   put("/users/:id") {
@@ -52,6 +55,9 @@ class UserServlet(val db: Database) extends ScalatraServlet with JacksonJsonSupp
   post("/users/signup") {
     println(parsedBody)
     val user = parsedBody.extract[UserServlet.NewUser]
+    println(user)
+    val insert = DBIO.seq(paidb.Tables.users += (0, user.userName, user.emailAddress, user.password, false))
+    db.run(insert)
     user
   }
 
