@@ -1,3 +1,5 @@
 package com.paidy.user.domain
 
-final case class EmailAddress(value: String) extends AnyVal
+import slick.driver.SQLiteDriver.api._
+
+final case class EmailAddress(value: String) extends AnyVal with MappedTo[String]

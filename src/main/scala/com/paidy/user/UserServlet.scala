@@ -5,15 +5,25 @@ import org.json4s.{DefaultFormats, Formats}
 import org.scalatra._
 import org.scalatra.json._
 import slick.jdbc.SQLiteProfile.api._
+import org.scalatra.FutureSupport
+import java.time.OffsetDateTime
+
 import com.paidy.user.domain._
 import com.paidy.{db => paidb}
 
 object UserServlet {
-  sealed case class NewUser(userName: String, emailAddress: String, password: String) {
+  sealed case class NewUser(userName: String, emailAddress: String, password: String)
+  sealed case class UserWithoutPW(id: UserId, userName: UserName, emailAddress: EmailAddress)
+
+  object UserWithoutPW {
+    def from(user: User): UserWithoutPW =
+      UserWithoutPW(user.id, user.userName, user.emailAddress)
   }
 }
 
-class UserServlet(val db: Database) extends ScalatraServlet with JacksonJsonSupport {
+class UserServlet(val db: Database) extends ScalatraServlet with JacksonJsonSupport with FutureSupport {
+  import UserServlet._
+
   protected implicit def executor = scala.concurrent.ExecutionContext.Implicits.global
 
   // Sets up automatic case class to JSON output serialization, required by          
@@ -26,22 +36,20 @@ class UserServlet(val db: Database) extends ScalatraServlet with JacksonJsonSupp
   }                                                                                  
                                          
   // an instance of UserMap to hold the collection                                                                                     
-  var userMap = new UserMap()
-
   get("/") {
     views.html.hello()
   }
 
   get("/users") {
-    db.run(paidb.Tables.users.result)
+    for {
+      users <- db.run(paidb.Tables.users.result)
+    } yield users.map(UserWithoutPW.from)
   }
 
   get("/users/:id") {
-    val id = Integer.parseInt(params("id"))
-    println("GET - Customer Id - arg. passed :: " + params("id"))
-    // userMap.get(params("id"))
+    val id = UserId(Integer.parseInt(params("id")))
     val query = paidb.Tables.users.filter(_.id === id)
-    db.run(query.result)
+    db.run(query.result).map(_.headOption.map(UserWithoutPW.from))
   }
 
   put("/users/:id") {
@@ -53,12 +61,9 @@ class UserServlet(val db: Database) extends ScalatraServlet with JacksonJsonSupp
   }
 
   post("/users/signup") {
-    println(parsedBody)
-    val user = parsedBody.extract[UserServlet.NewUser]
-    println(user)
-    val insert = DBIO.seq(paidb.Tables.users += (0, user.userName, user.emailAddress, user.password, false))
+    val user = parsedBody.extract[NewUser]
+    val insert = DBIO.seq(paidb.Tables.users += User(UserId(0), UserName(user.userName), EmailAddress(user.emailAddress), Some(Password(user.password)), OffsetDateTime.now))
     db.run(insert)
-    user
   }
 
   get("/users/generate") {
