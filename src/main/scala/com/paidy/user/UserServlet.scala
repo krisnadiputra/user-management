@@ -7,7 +7,8 @@ import org.scalatra.json._
 import slick.jdbc.SQLiteProfile.api._
 import org.scalatra.FutureSupport
 import java.time.OffsetDateTime
-import scala.concurrent.Future
+import scala.concurrent.{ ExecutionContext, ExecutionContext$, Future, Promise, Await }
+import scala.concurrent.duration._
 
 import com.paidy.user.domain._
 import com.paidy.{db => paidb}
@@ -97,6 +98,7 @@ class UserServlet(
 
   post("/users/signup") {
     val signupData = parsedBody.extract[SignupData]
+    // need to check if the email address already exist, in the db
     val insert = DBIO.seq(
       paidb.Tables.users += User(
         UserId(0),
@@ -106,7 +108,11 @@ class UserServlet(
         OffsetDateTime.now
       )
     )
-    db.run(insert)
+    Await.result(db.run(insert), Duration.Inf)
+    val query = paidb.Tables.users.filter(
+      _.emailAddress === EmailAddress(signupData.emailAddress)
+    )
+    db.run(query.result).map(_.headOption.map(UserWithoutPW.from))
   }
 
   post("/users/:id/block") {
