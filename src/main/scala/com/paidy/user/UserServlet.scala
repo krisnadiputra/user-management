@@ -47,7 +47,11 @@ class UserServlet(
   // Before every action runs, set the content type to be in JSON format             
   before() {                                                                         
     contentType = formats("json")                                                
-  }                                                                                  
+  }
+
+  notFound {
+    <h1>Not found.</h1>
+  }                                                                        
                                                                                   
   get("/") {
     views.html.hello()
