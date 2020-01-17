@@ -12,7 +12,8 @@ final case class User(
   userName: UserName,
   emailAddress: EmailAddress,
   password: Option[Password],
-  createdAt: OffsetDateTime
+  createdAt: OffsetDateTime,
+  blockedAt: Option[OffsetDateTime]
 ) {
   // def status: User.Status =
   //   User.status(this)
@@ -30,18 +31,23 @@ final case class User(
     this
       .modify(_.password)
       .setTo(password)
-      
+
   // def updatePassword(password: Password, at: OffsetDateTime): User =
   //   User.updatePassword(this, password, at)
   //
   // def resetPassword(at: OffsetDateTime): User =
   //   User.resetPassword(this, at)
   //
-  // def block(at: OffsetDateTime): User =
-  //   User.block(this, at)
-  //
-  // def unblock(at: OffsetDateTime): User =
-  //   User.unblock(this, at)
+  def block(at: OffsetDateTime): User =
+    this
+      .modify(_.blockedAt)
+      .setTo(Some(at))
+
+  def unblock(): User =
+    this
+      .modify(_.blockedAt)
+      .setTo(None)
+
   //
   // def delete(at: OffsetDateTime): User =
   //   User.delete(this, at)
