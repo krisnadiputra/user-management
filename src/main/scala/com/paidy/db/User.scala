@@ -18,6 +18,9 @@ object Tables {
     def password = column[Option[Password]]("password")
     def createdAt = column[OffsetDateTime]("createdAt")
     def * = (id, userName, emailAddress, password, createdAt) <> (User.tupled, User.unapply)
+
+    def userNameIndex = index("userName", userName, unique = true)
+    def emailAddressIndex = index("emailAddress", emailAddress, unique = true)
   }
 
   val users = TableQuery[Users]

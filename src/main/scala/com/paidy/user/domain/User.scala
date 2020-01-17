@@ -26,6 +26,11 @@ final case class User(
       .modify(_.emailAddress)
       .setTo(emailAddress)
 
+  def updatePassword(password: Option[Password]): User =
+    this
+      .modify(_.password)
+      .setTo(password)
+      
   // def updatePassword(password: Password, at: OffsetDateTime): User =
   //   User.updatePassword(this, password, at)
   //
