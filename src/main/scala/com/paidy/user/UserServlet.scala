@@ -28,23 +28,26 @@ object UserServlet {
     emailAddress: Option[String],
     password: Option[String]
   )
-  // update this with createdAt
   sealed case class UserWithoutPW(
     id: UserId,
     userName: UserName,
     emailAddress: EmailAddress,
-    createdAt: OffsetDateTime,
-    blockedAt: Option[OffsetDateTime]
+    createdAt: String,
+    updatedAt: String,
+    blockedAt: Option[OffsetDateTime],
+    version: Int
   )
   object UserWithoutPW {
     def from(user: User): UserWithoutPW = {
-      println(user)
+      // best practice?
       UserWithoutPW(
         user.id,
         user.userName,
         user.emailAddress,
-        user.createdAt,
-        user.blockedAt
+        user.createdAt.toString(),
+        user.updatedAt.toString(),
+        user.blockedAt,
+        user.version
       )
     }
   }
@@ -57,8 +60,8 @@ class UserServlet(
 
   protected implicit def executor = scala.concurrent.ExecutionContext.Implicits.global
 
-  // Sets up automatic case class to JSON output serialization, required by          
-  // the JValueResult trait.                                                         
+  // Sets up automatic case class to JSON output serialization
+  // required by the JValueResult trait.
   protected implicit lazy val jsonFormats: Formats = DefaultFormats
 
   // Before every action runs, set the content type to be in JSON format             
@@ -87,11 +90,40 @@ class UserServlet(
     db.run(query.result).map(_.headOption.map(UserWithoutPW.from))
   }
 
-  post("/users/:id") {
+  put("/users/:id") {
     val id = UserId(Integer.parseInt(params("id")))
     val param = parsedBody.extract[UpdateData]
 
     val findUser = paidb.Tables.users.filter(_.id === id)
+
+    val updated = for {
+      user <- db.run(findUser.result).map(_.headOption)
+    } yield {
+      user.map(user => {
+        val emailUpdated = param.emailAddress.map(
+          it => user.updateEmailAddress(
+            EmailAddress(it),
+            OffsetDateTime.now
+          )
+        ) getOrElse user
+        val pwUpdated = param.password.map(
+          it => emailUpdated.updatePassword(
+            Some(Password(it)),
+            OffsetDateTime.now
+          )
+        ) getOrElse emailUpdated
+        pwUpdated
+      })
+    }
+
+    updated.map(user =>
+      user.map(user => {
+        val query = paidb.Tables.users.filter(_.id === id).update(user)
+        db.run(query).map { _ => Ok(UserWithoutPW.from(user)) }
+      }) getOrElse {
+        Future(NotFound("User not found"))
+      }
+    )
 
     // val queries: ArrayBuffer[slick.jdbc.SQLiteProfile.ProfileAction[Int,slick.dbio.NoStream,slick.dbio.Effect.Write]] = ArrayBuffer()
 
@@ -111,34 +143,6 @@ class UserServlet(
     //   updates <- db.run(DBIO.seq(queries: _*).transactionally)
     // } yield {
     // }
-
-    // val query = (param.emailAddress, param.password) match {
-    //   case (Some(emailAddress), Some(password)) =>
-    //     DBIO.seq(
-    //       findUser.map(_.emailAddress).update(EmailAddress("foo")),
-    //       findUser.map(_.password).update(Some(Password(password)))
-    //     )
-    //   case _ => ()
-    // }
-
-    val updated = for {
-      user <- db.run(findUser.result).map(_.headOption)
-    } yield {
-      user.map(user => {
-        val email = param.emailAddress.map(it => user.updateEmailAddress(EmailAddress(it))) getOrElse user
-        val pw = param.password.map(it => email.updatePassword(Some(Password(it)))) getOrElse email
-        pw
-      })
-    }
-
-    updated.map(user =>
-      user.map(user => {
-        val query = paidb.Tables.users.filter(_.id === id).update(user)
-        db.run(query).map { _ => Ok(UserWithoutPW.from(user)) }
-      }) getOrElse {
-        Future(NotFound("User not found"))
-      }
-    )
   }
 
   delete("/users/:id") {
@@ -152,14 +156,17 @@ class UserServlet(
   post("/users/signup") {
     // try catch here / BadRequest
     val signupData = parsedBody.extract[SignupData]
+    val now = OffsetDateTime.now
     val addUser = DBIO.seq(
       paidb.Tables.users += User(
         UserId(0),
         UserName(signupData.userName),
         EmailAddress(signupData.emailAddress),
         Some(Password(signupData.password)),
-        OffsetDateTime.now,
-        None
+        now,
+        now,
+        None,
+        1
       )
     )
     val findUser = paidb.Tables.users.filter(
@@ -203,7 +210,7 @@ class UserServlet(
     val updated = for {
       user <- db.run(findUser.result).map(_.headOption)
     } yield {
-      user.map(_.unblock())
+      user.map(_.unblock(OffsetDateTime.now))
     }
 
     updated.map(user =>

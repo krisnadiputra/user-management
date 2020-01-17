@@ -17,14 +17,18 @@ object Tables {
     def emailAddress = column[EmailAddress]("emailAddress")
     def password = column[Option[Password]]("password")
     def createdAt = column[OffsetDateTime]("createdAt")
+    def updatedAt = column[OffsetDateTime]("updatedAt")
     def blockedAt = column[Option[OffsetDateTime]]("blockedAt")
+    def version = column[Int]("version")
     def * = (
       id,
       userName,
       emailAddress,
       password,
       createdAt,
-      blockedAt
+      updatedAt,
+      blockedAt,
+      version
     ) <> (User.tupled, User.unapply)
 
     def userNameIndex = index("userName", userName, unique = true)
