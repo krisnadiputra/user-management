@@ -103,6 +103,8 @@ class UserServlet(
   // required by the JValueResult trait.
   protected implicit lazy val jsonFormats: Formats = DefaultFormats
 
+  protected val prefix: String = "/api"
+
   // Before every action runs, set the content type to be in JSON format             
   before() {                                                                         
     contentType = formats("json")                                                
@@ -116,13 +118,13 @@ class UserServlet(
     views.html.hello()
   }
 
-  get("/users") {
+  get(prefix + "/users") {
     for {
       users <- db.run(paidb.Tables.users.result)
     } yield users.map(UserWithoutPW.from)
   }
 
-  get("/users/:id") {
+  get(prefix + "/users/:id") {
     withId(params) { id =>
       val query = paidb.Tables.users.filter(_.id === id)
       for {
@@ -137,7 +139,7 @@ class UserServlet(
     }
   }
 
-  put("/users/:id") {
+  put(prefix + "/users/:id") {
     withId(params) { id =>
       val newData = parsedBody.extract[UpdateData]
 
@@ -199,7 +201,7 @@ class UserServlet(
     // }
   }
 
-  delete("/users/:id") {
+  delete(prefix + "/users/:id") {
     withId(params) { id => 
       val query = paidb.Tables.users.filter(_.id === id)
       val action = query.delete
@@ -209,7 +211,7 @@ class UserServlet(
     }
   }
 
-  post("/users/signup") {
+  post(prefix + "/users/signup") {
     withSignupData(parsedBody) { signupData =>
       val now = OffsetDateTime.now
       val addUser = DBIO.seq(
@@ -242,7 +244,7 @@ class UserServlet(
     }
   }
 
-  post("/users/:id/block") {
+  post(prefix + "/users/:id/block") {
     withId(params) { id =>
       val findUser = paidb.Tables.users.filter(_.id === id)
 
@@ -263,7 +265,7 @@ class UserServlet(
     }
   }
 
-  post("/users/:id/unblock") {
+  post(prefix + "/users/:id/unblock") {
     withId(params) { id =>
       val findUser = paidb.Tables.users.filter(_.id === id)
 
@@ -284,7 +286,7 @@ class UserServlet(
     }
   }
 
-  post("/users/:id/reset-password") {
+  post(prefix + "/users/:id/reset-password") {
     withId(params) { id =>
       val findUser = paidb.Tables.users.filter(_.id === id)
 
