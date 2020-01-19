@@ -71,7 +71,7 @@ class UserServlet(
       body(id)
     } catch {
       case e: NumberFormatException => {
-        Future(BadRequest("Invalid ID"))
+        Future(BadRequest(Map("message" -> "Invalid id!")))
       }
     }
   }
@@ -115,7 +115,15 @@ class UserServlet(
   get("/users/:id") {
     withId(params) { id =>
       val query = paidb.Tables.users.filter(_.id === id)
-      db.run(query.result).map(_.headOption.map(UserWithoutPW.from)).map(Ok(_))
+      for {
+        users <- db.run(query.result)
+      } yield {
+        if (users.size > 0) {
+          Ok(users.headOption.map(UserWithoutPW.from))
+        } else {
+          NotFound(Map("message" -> "User not found!"))
+        }
+      }
     }
   }
 
