@@ -33,6 +33,13 @@ object UserServlet {
       !(this.emailAddress.isEmpty && this.password.isEmpty)
     }
   }
+  sealed case class ResMessage(
+    message: String
+  ) {
+    def toMap(): Map[String, String] = {
+      Map("message" -> this.message)
+    }
+  }
   sealed case class UserWithoutPW(
     id: UserId,
     userName: UserName,
@@ -74,7 +81,7 @@ class UserServlet(
       body(id)
     } catch {
       case e: NumberFormatException => {
-        Future(BadRequest(Map("message" -> "Invalid id!")))
+        Future(BadRequest(ResMessage("Invalid id!").toMap))
       }
     }
   }
@@ -88,7 +95,7 @@ class UserServlet(
       val signupData = parsedBody.extract[SignupData]
       body(signupData)
     } catch {
-      case e : Throwable => Future(BadRequest(Map("message" -> e.toString())))
+      case e : Throwable => Future(BadRequest(ResMessage(e.toString).toMap))
     }
   }
 
@@ -102,7 +109,7 @@ class UserServlet(
   }
 
   notFound {
-    NotFound(Map("message" -> "This address does not exist."))
+    NotFound(ResMessage("This address does not exist.").toMap)
   }                                                                        
                                                                                   
   get("/") {
@@ -124,7 +131,7 @@ class UserServlet(
         if (users.size > 0) {
           Ok(users.headOption.map(UserWithoutPW.from))
         } else {
-          NotFound(Map("message" -> "User not found!"))
+          NotFound(ResMessage("User not found!").toMap)
         }
       }
     }
@@ -161,14 +168,14 @@ class UserServlet(
           user.map(user => {
             val query = paidb.Tables.users.filter(_.id === id).update(user)
             db.run(query).map { x => Ok(UserWithoutPW.from(user)) } recover {
-              case cause => BadRequest(Map("message" -> cause.toString))
+              case cause => BadRequest(ResMessage(cause.toString).toMap)
             }
           }) getOrElse {
-            Future(NotFound(Map("message" -> "User not found!")))
+            Future(NotFound(ResMessage("User not found!").toMap))
           }
         )
       } else {
-        Future(BadRequest(Map("message" -> "There is no data to update!")))
+        Future(BadRequest(ResMessage("There is no data to update!").toMap))
       }
     }
 
@@ -197,7 +204,7 @@ class UserServlet(
       val query = paidb.Tables.users.filter(_.id === id)
       val action = query.delete
       db.run(action).map(affectedRows => {
-        if (affectedRows > 0) NoContent() else NotFound(Map("message" -> "User not found!"))
+        if (affectedRows > 0) NoContent() else NotFound(ResMessage("User not found!").toMap)
       })
     }
   }
@@ -229,7 +236,7 @@ class UserServlet(
       } recover {
         case cause => {
           // unique userName or emailAddress
-          BadRequest(Map("message" -> cause.toString))
+          BadRequest(ResMessage(cause.toString).toMap)
         }
       }
     }
@@ -250,7 +257,7 @@ class UserServlet(
           val query = paidb.Tables.users.filter(_.id === id).update(user)
           db.run(query).map { _ => Ok(UserWithoutPW.from(user)) }
         }) getOrElse {
-          Future(NotFound(Map("message" -> "User not found!")))
+          Future(NotFound(ResMessage("User not found!").toMap))
         }
       )
     }
@@ -271,7 +278,7 @@ class UserServlet(
           val query = paidb.Tables.users.filter(_.id === id).update(user)
           db.run(query).map { _ => Ok(UserWithoutPW.from(user)) }
         }) getOrElse {
-          Future(NotFound(Map("message" -> "User not found!")))
+          Future(NotFound(ResMessage("User not found!").toMap))
         }
       )
     }
@@ -292,7 +299,7 @@ class UserServlet(
           val query = paidb.Tables.users.filter(_.id === id).update(user)
           db.run(query).map { _ => Ok(UserWithoutPW.from(user)) }
         }) getOrElse {
-          Future(NotFound(Map("message" -> "User not found!")))
+          Future(NotFound(ResMessage("User not found!").toMap))
         }
       )
     }
