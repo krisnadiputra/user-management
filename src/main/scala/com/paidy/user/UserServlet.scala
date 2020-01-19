@@ -9,7 +9,7 @@ import scala.util.{Failure, Success}
 import slick.jdbc.SQLiteProfile.api._
 import com.mchange.v2.c3p0.ComboPooledDataSource
 
-import org.json4s.{DefaultFormats, Formats}
+import org.json4s.{DefaultFormats, Formats, JValue}
 import org.scalatra._
 import org.scalatra.json._
 import org.scalatra.FutureSupport
@@ -61,7 +61,11 @@ class UserServlet(
 
   protected implicit def executor = scala.concurrent.ExecutionContext.Implicits.global
 
-  def withId(params: Params)(body: UserId => Future[ActionResult]): Future[ActionResult] = {
+  def withId(
+    params: Params
+  )(
+    body: UserId => Future[ActionResult]
+  ): Future[ActionResult] = {
     try {
       val id = UserId(Integer.parseInt(params("id")))
       body(id)
@@ -69,6 +73,19 @@ class UserServlet(
       case e: NumberFormatException => {
         Future(BadRequest("Invalid ID"))
       }
+    }
+  }
+
+  def withSignupData(
+    parsedBody: JValue
+  )(
+    body: SignupData => Future[ActionResult]
+  ): Future[ActionResult] = {
+    try {
+      val signupData = parsedBody.extract[SignupData]
+      body(signupData)
+    } catch {
+      case e : Throwable => Future(BadRequest(Map("message" -> e.toString())))
     }
   }
 
@@ -82,7 +99,7 @@ class UserServlet(
   }
 
   notFound {
-    NotFound("Not Found!")
+    NotFound(Map("message" -> "This address does not exist."))
   }                                                                        
                                                                                   
   get("/") {
@@ -169,32 +186,35 @@ class UserServlet(
   }
 
   post("/users/signup") {
-    // try catch here / BadRequest
-    val signupData = parsedBody.extract[SignupData]
-    val now = OffsetDateTime.now
-    val addUser = DBIO.seq(
-      paidb.Tables.users += User(
-        UserId(0),
-        UserName(signupData.userName),
-        EmailAddress(signupData.emailAddress),
-        Some(Password(signupData.password)),
-        now,
-        now,
-        None,
-        1
+    withSignupData(parsedBody) { signupData =>
+      val now = OffsetDateTime.now
+      val addUser = DBIO.seq(
+        paidb.Tables.users += User(
+          UserId(0),
+          UserName(signupData.userName),
+          EmailAddress(signupData.emailAddress),
+          Some(Password(signupData.password)),
+          now,
+          now,
+          None,
+          1
+        )
       )
-    )
-    val findUser = paidb.Tables.users.filter(
-      _.emailAddress === EmailAddress(signupData.emailAddress)
-    ).result
+      val findUser = paidb.Tables.users.filter(
+        _.emailAddress === EmailAddress(signupData.emailAddress)
+      ).result
 
-    {
-      for {
-        _ <- db.run(addUser)
-        user <- db.run(findUser).map(_.headOption.map(UserWithoutPW.from))
-      } yield Ok(user)
-    } recover {
-      case cause => BadRequest(Map("error" -> cause.toString))
+      {
+        for {
+          _ <- db.run(addUser)
+          user <- db.run(findUser).map(_.headOption.map(UserWithoutPW.from))
+        } yield Created(user)
+      } recover {
+        case cause => {
+          // unique userName or emailAddress
+          BadRequest(Map("message" -> cause.toString))
+        }
+      }
     }
   }
 
