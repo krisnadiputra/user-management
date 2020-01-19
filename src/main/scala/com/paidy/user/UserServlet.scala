@@ -158,7 +158,7 @@ class UserServlet(
           val query = paidb.Tables.users.filter(_.id === id).update(user)
           db.run(query).map { _ => Ok(UserWithoutPW.from(user)) }
         }) getOrElse {
-          Future(NotFound("User not found"))
+          Future(NotFound("message" -> "User not found!"))
         }
       )
     }
@@ -241,7 +241,7 @@ class UserServlet(
         val query = paidb.Tables.users.filter(_.id === id).update(user)
         db.run(query).map { _ => Ok(UserWithoutPW.from(user)) }
       }) getOrElse {
-        Future(NotFound("User not found"))
+        Future(NotFound("message" -> "User not found!"))
       }
     )
   }
@@ -261,7 +261,7 @@ class UserServlet(
           val query = paidb.Tables.users.filter(_.id === id).update(user)
           db.run(query).map { _ => Ok(UserWithoutPW.from(user)) }
         }) getOrElse {
-          Future(NotFound("User not found"))
+          Future(NotFound("message" -> "User not found!"))
         }
       )
     }
@@ -269,11 +269,22 @@ class UserServlet(
 
   post("/users/:id/reset-password") {
     withId(params) { id =>
-      val query = for {
-        user <- paidb.Tables.users if user.id === id
-      } yield user.password
-      val update = query.update(None)
-      db.run(update).map(_ => Ok(Map("success" -> true)))
+      val findUser = paidb.Tables.users.filter(_.id === id)
+
+      val updated = for {
+        user <- db.run(findUser.result).map(_.headOption)
+      } yield {
+        user.map(_.resetPassword(OffsetDateTime.now))
+      }
+
+      updated.flatMap(user =>
+        user.map(user => {
+          val query = paidb.Tables.users.filter(_.id === id).update(user)
+          db.run(query).map { _ => Ok(UserWithoutPW.from(user)) }
+        }) getOrElse {
+          Future(NotFound("message" -> "User not found!"))
+        }
+      )
     }
   }
 

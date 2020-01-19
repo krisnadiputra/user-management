@@ -35,6 +35,15 @@ final case class User(
       .modify(_.version)
       .using(_ + 1)
 
+  def resetPassword(at: OffsetDateTime): User =
+    this
+      .modify(_.password)
+      .setTo(None)
+      .modify(_.updatedAt)
+      .setTo(at)
+      .modify(_.version)
+      .using(_ + 1)
+
   def block(at: OffsetDateTime): User =
     this
       .modify(_.blockedAt)
@@ -92,15 +101,6 @@ final case class User(
 //     if (user.metadata.deletedAt.isDefined) Status.Deleted
 //     else if (user.metadata.blockedAt.isDefined) Status.Blocked
 //     else Status.Active
-// 
-//   def resetPassword(user: User, at: OffsetDateTime): User =
-//     user
-//       .modify(_.password)
-//       .setTo(None)
-//       .modify(_.metadata.updatedAt)
-//       .setTo(at)
-//       .modify(_.metadata.version)
-//       .using(_ + 1)
 // 
 //   def delete(user: User, at: OffsetDateTime): User =
 //     user
