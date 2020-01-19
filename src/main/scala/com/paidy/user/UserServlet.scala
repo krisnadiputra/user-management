@@ -1,9 +1,10 @@
 package com.paidy.user
 
-import scala.util.{Failure, Success}
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, ExecutionContext$, Future, Promise, Await}
+import scala.util.Try
+import scala.util.{Failure, Success}
 
 import slick.jdbc.SQLiteProfile.api._
 import com.mchange.v2.c3p0.ComboPooledDataSource
@@ -34,7 +35,7 @@ object UserServlet {
     emailAddress: EmailAddress,
     createdAt: String,
     updatedAt: String,
-    blockedAt: Option[OffsetDateTime],
+    blockedAt: Option[String],
     version: Int
   )
   object UserWithoutPW {
@@ -46,7 +47,7 @@ object UserServlet {
         user.emailAddress,
         user.createdAt.toString(),
         user.updatedAt.toString(),
-        user.blockedAt,
+        user.blockedAt.map(_.toString()),
         user.version
       )
     }
@@ -59,6 +60,17 @@ class UserServlet(
   import UserServlet._
 
   protected implicit def executor = scala.concurrent.ExecutionContext.Implicits.global
+
+  def withId(params: Params)(body: UserId => Future[ActionResult]): Future[ActionResult] = {
+    try {
+      val id = UserId(Integer.parseInt(params("id")))
+      body(id)
+    } catch {
+      case e: NumberFormatException => {
+        Future(BadRequest("Invalid ID"))
+      }
+    }
+  }
 
   // Sets up automatic case class to JSON output serialization
   // required by the JValueResult trait.
@@ -84,46 +96,47 @@ class UserServlet(
   }
 
   get("/users/:id") {
-    // try catch here wrong id / NotFound
-    val id = UserId(Integer.parseInt(params("id")))
-    val query = paidb.Tables.users.filter(_.id === id)
-    db.run(query.result).map(_.headOption.map(UserWithoutPW.from))
+    withId(params) { id =>
+      val query = paidb.Tables.users.filter(_.id === id)
+      db.run(query.result).map(_.headOption.map(UserWithoutPW.from)).map(Ok(_))
+    }
   }
 
   put("/users/:id") {
-    val id = UserId(Integer.parseInt(params("id")))
-    val param = parsedBody.extract[UpdateData]
+    withId(params) { id =>
+      val param = parsedBody.extract[UpdateData]
 
-    val findUser = paidb.Tables.users.filter(_.id === id)
+      val findUser = paidb.Tables.users.filter(_.id === id)
 
-    val updated = for {
-      user <- db.run(findUser.result).map(_.headOption)
-    } yield {
-      user.map(user => {
-        val emailUpdated = param.emailAddress.map(
-          it => user.updateEmailAddress(
-            EmailAddress(it),
-            OffsetDateTime.now
-          )
-        ) getOrElse user
-        val pwUpdated = param.password.map(
-          it => emailUpdated.updatePassword(
-            Some(Password(it)),
-            OffsetDateTime.now
-          )
-        ) getOrElse emailUpdated
-        pwUpdated
-      })
-    }
-
-    updated.map(user =>
-      user.map(user => {
-        val query = paidb.Tables.users.filter(_.id === id).update(user)
-        db.run(query).map { _ => Ok(UserWithoutPW.from(user)) }
-      }) getOrElse {
-        Future(NotFound("User not found"))
+      val updated = for {
+        user <- db.run(findUser.result).map(_.headOption)
+      } yield {
+        user.map(user => {
+          val emailUpdated = param.emailAddress.map(
+            it => user.updateEmailAddress(
+              EmailAddress(it),
+              OffsetDateTime.now
+            )
+          ) getOrElse user
+          val pwUpdated = param.password.map(
+            it => emailUpdated.updatePassword(
+              Some(Password(it)),
+              OffsetDateTime.now
+            )
+          ) getOrElse emailUpdated
+          pwUpdated
+        })
       }
-    )
+
+      updated.flatMap(user =>
+        user.map(user => {
+          val query = paidb.Tables.users.filter(_.id === id).update(user)
+          db.run(query).map { _ => Ok(UserWithoutPW.from(user)) }
+        }) getOrElse {
+          Future(NotFound("User not found"))
+        }
+      )
+    }
 
     // val queries: ArrayBuffer[slick.jdbc.SQLiteProfile.ProfileAction[Int,slick.dbio.NoStream,slick.dbio.Effect.Write]] = ArrayBuffer()
 
@@ -206,33 +219,34 @@ class UserServlet(
   }
 
   post("/users/:id/unblock") {
-    val id = UserId(Integer.parseInt(params("id")))
-    val findUser = paidb.Tables.users.filter(_.id === id)
+    withId(params) { id =>
+      val findUser = paidb.Tables.users.filter(_.id === id)
 
-    val updated = for {
-      user <- db.run(findUser.result).map(_.headOption)
-    } yield {
-      user.map(_.unblock(OffsetDateTime.now))
-    }
-
-    updated.map(user =>
-      user.map(user => {
-        val query = paidb.Tables.users.filter(_.id === id).update(user)
-        db.run(query).map { _ => Ok(UserWithoutPW.from(user)) }
-      }) getOrElse {
-        Future(NotFound("User not found"))
+      val updated = for {
+        user <- db.run(findUser.result).map(_.headOption)
+      } yield {
+        user.map(_.unblock(OffsetDateTime.now))
       }
-    )
+
+      updated.flatMap(user =>
+        user.map(user => {
+          val query = paidb.Tables.users.filter(_.id === id).update(user)
+          db.run(query).map { _ => Ok(UserWithoutPW.from(user)) }
+        }) getOrElse {
+          Future(NotFound("User not found"))
+        }
+      )
+    }
   }
 
   post("/users/:id/reset-password") {
-    // try catch NotFound
-    val id = UserId(Integer.parseInt(params("id")))
-    val query = for {
-      user <- paidb.Tables.users if user.id === id
-    } yield user.password
-    val update = query.update(None)
-    db.run(update).map(_ => Ok(Map("success" -> true)))
+    withId(params) { id =>
+      val query = for {
+        user <- paidb.Tables.users if user.id === id
+      } yield user.password
+      val update = query.update(None)
+      db.run(update).map(_ => Ok(Map("success" -> true)))
+    }
   }
 
 }
