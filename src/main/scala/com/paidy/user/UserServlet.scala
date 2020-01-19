@@ -28,7 +28,11 @@ object UserServlet {
   sealed case class UpdateData(
     emailAddress: Option[String],
     password: Option[String]
-  )
+  ) {
+    def exist(): Boolean = {
+      !(this.emailAddress.isEmpty && this.password.isEmpty)
+    }
+  }
   sealed case class UserWithoutPW(
     id: UserId,
     userName: UserName,
@@ -40,7 +44,6 @@ object UserServlet {
   )
   object UserWithoutPW {
     def from(user: User): UserWithoutPW = {
-      // best practice?
       UserWithoutPW(
         user.id,
         user.userName,
@@ -129,38 +132,44 @@ class UserServlet(
 
   put("/users/:id") {
     withId(params) { id =>
-      val param = parsedBody.extract[UpdateData]
+      val newData = parsedBody.extract[UpdateData]
 
-      val findUser = paidb.Tables.users.filter(_.id === id)
+      if (newData.exist()) {
+        val findUser = paidb.Tables.users.filter(_.id === id)
 
-      val updated = for {
-        user <- db.run(findUser.result).map(_.headOption)
-      } yield {
-        user.map(user => {
-          val emailUpdated = param.emailAddress.map(
-            it => user.updateEmailAddress(
-              EmailAddress(it),
-              OffsetDateTime.now
-            )
-          ) getOrElse user
-          val pwUpdated = param.password.map(
-            it => emailUpdated.updatePassword(
-              Some(Password(it)),
-              OffsetDateTime.now
-            )
-          ) getOrElse emailUpdated
-          pwUpdated
-        })
-      }
-
-      updated.flatMap(user =>
-        user.map(user => {
-          val query = paidb.Tables.users.filter(_.id === id).update(user)
-          db.run(query).map { _ => Ok(UserWithoutPW.from(user)) }
-        }) getOrElse {
-          Future(NotFound("message" -> "User not found!"))
+        val updated = for {
+          user <- db.run(findUser.result).map(_.headOption)
+        } yield {
+          user.map(user => {
+            val emailUpdated = newData.emailAddress.map(
+              it => user.updateEmailAddress(
+                EmailAddress(it),
+                OffsetDateTime.now
+              )
+            ) getOrElse user
+            val pwUpdated = newData.password.map(
+              it => emailUpdated.updatePassword(
+                Some(Password(it)),
+                OffsetDateTime.now
+              )
+            ) getOrElse emailUpdated
+            pwUpdated
+          })
         }
-      )
+
+        updated.flatMap(user =>
+          user.map(user => {
+            val query = paidb.Tables.users.filter(_.id === id).update(user)
+            db.run(query).map { x => Ok(UserWithoutPW.from(user)) } recover {
+              case cause => BadRequest(Map("message" -> cause.toString))
+            }
+          }) getOrElse {
+            Future(NotFound(Map("message" -> "User not found!")))
+          }
+        )
+      } else {
+        Future(BadRequest(Map("message" -> "There is no data to update!")))
+      }
     }
 
     // val queries: ArrayBuffer[slick.jdbc.SQLiteProfile.ProfileAction[Int,slick.dbio.NoStream,slick.dbio.Effect.Write]] = ArrayBuffer()
@@ -241,7 +250,7 @@ class UserServlet(
         val query = paidb.Tables.users.filter(_.id === id).update(user)
         db.run(query).map { _ => Ok(UserWithoutPW.from(user)) }
       }) getOrElse {
-        Future(NotFound("message" -> "User not found!"))
+        Future(NotFound(Map("message" -> "User not found!")))
       }
     )
   }
@@ -261,7 +270,7 @@ class UserServlet(
           val query = paidb.Tables.users.filter(_.id === id).update(user)
           db.run(query).map { _ => Ok(UserWithoutPW.from(user)) }
         }) getOrElse {
-          Future(NotFound("message" -> "User not found!"))
+          Future(NotFound(Map("message" -> "User not found!")))
         }
       )
     }
@@ -282,7 +291,7 @@ class UserServlet(
           val query = paidb.Tables.users.filter(_.id === id).update(user)
           db.run(query).map { _ => Ok(UserWithoutPW.from(user)) }
         }) getOrElse {
-          Future(NotFound("message" -> "User not found!"))
+          Future(NotFound(Map("message" -> "User not found!")))
         }
       )
     }
