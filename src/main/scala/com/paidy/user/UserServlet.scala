@@ -147,7 +147,7 @@ class UserServlet(
         val findUser = paidb.Tables.users.filter(_.id === id)
 
         val updated = for {
-          user <- db.run(findUser.result).map(_.headOption)
+          user <- db.run(findUser.result.withPinnedSession).map(_.headOption)
         } yield {
           user.map(user => {
             val emailUpdated = newData.emailAddress.map(
@@ -180,25 +180,6 @@ class UserServlet(
         Future(BadRequest(ResMessage("There is no data to update!").toMap))
       }
     }
-
-    // val queries: ArrayBuffer[slick.jdbc.SQLiteProfile.ProfileAction[Int,slick.dbio.NoStream,slick.dbio.Effect.Write]] = ArrayBuffer()
-
-    // param.emailAddress match {
-    //   case Some(emailAddress) =>
-    //     queries += findUser.map(_.emailAddress).update(EmailAddress(emailAddress))
-    //   case _ => ()
-    // }
-
-    // param.password match {
-    //   case Some(password) =>
-    //     queries += findUser.map(_.password).update(Some(Password(password)))
-    //   case _ => ()
-    // }
-
-    // for {
-    //   updates <- db.run(DBIO.seq(queries: _*).transactionally)
-    // } yield {
-    // }
   }
 
   delete(prefix + "/users/:id") {
@@ -206,7 +187,11 @@ class UserServlet(
       val query = paidb.Tables.users.filter(_.id === id)
       val action = query.delete
       db.run(action).map(affectedRows => {
-        if (affectedRows > 0) NoContent() else NotFound(ResMessage("User not found!").toMap)
+        if (affectedRows > 0) {
+          NoContent()
+        } else {
+          NotFound(ResMessage("User not found!").toMap)
+        }
       })
     }
   }
@@ -249,7 +234,7 @@ class UserServlet(
       val findUser = paidb.Tables.users.filter(_.id === id)
 
       val updated = for {
-        user <- db.run(findUser.result).map(_.headOption)
+        user <- db.run(findUser.result.withPinnedSession).map(_.headOption)
       } yield {
         user.map(_.block(OffsetDateTime.now))
       }
@@ -270,7 +255,7 @@ class UserServlet(
       val findUser = paidb.Tables.users.filter(_.id === id)
 
       val updated = for {
-        user <- db.run(findUser.result).map(_.headOption)
+        user <- db.run(findUser.result.withPinnedSession).map(_.headOption)
       } yield {
         user.map(_.unblock(OffsetDateTime.now))
       }
@@ -291,7 +276,7 @@ class UserServlet(
       val findUser = paidb.Tables.users.filter(_.id === id)
 
       val updated = for {
-        user <- db.run(findUser.result).map(_.headOption)
+        user <- db.run(findUser.result.withPinnedSession).map(_.headOption)
       } yield {
         user.map(_.resetPassword(OffsetDateTime.now))
       }
