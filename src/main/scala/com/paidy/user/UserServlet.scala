@@ -103,8 +103,6 @@ class UserServlet(
   // required by the JValueResult trait.
   protected implicit lazy val jsonFormats: Formats = DefaultFormats
 
-  protected val prefix: String = "/api"
-
   // Before every action runs, set the content type to be in JSON format             
   before() {                                                                         
     contentType = formats("json")                                                
@@ -113,18 +111,14 @@ class UserServlet(
   notFound {
     NotFound(ResMessage("This address does not exist.").toMap)
   }                                                                        
-                                                                                  
-  get("/") {
-    views.html.hello()
-  }
 
-  get(prefix + "/users") {
+  get("/users") {
     for {
       users <- db.run(paidb.Tables.users.result)
     } yield users.map(UserWithoutPW.from)
   }
 
-  get(prefix + "/users/:id") {
+  get("/users/:id") {
     withId(params) { id =>
       val query = paidb.Tables.users.filter(_.id === id)
       for {
@@ -139,7 +133,7 @@ class UserServlet(
     }
   }
 
-  put(prefix + "/users/:id") {
+  put("/users/:id") {
     withId(params) { id =>
       val newData = parsedBody.extract[UpdateData]
 
@@ -182,7 +176,7 @@ class UserServlet(
     }
   }
 
-  delete(prefix + "/users/:id") {
+  delete("/users/:id") {
     withId(params) { id => 
       val query = paidb.Tables.users.filter(_.id === id)
       val action = query.delete
@@ -196,7 +190,7 @@ class UserServlet(
     }
   }
 
-  post(prefix + "/users/signup") {
+  post("/users/signup") {
     withSignupData(parsedBody) { signupData =>
       val now = OffsetDateTime.now
       val addUser = DBIO.seq(
@@ -229,7 +223,7 @@ class UserServlet(
     }
   }
 
-  post(prefix + "/users/:id/block") {
+  post("/users/:id/block") {
     withId(params) { id =>
       val findUser = paidb.Tables.users.filter(_.id === id)
 
@@ -250,7 +244,7 @@ class UserServlet(
     }
   }
 
-  post(prefix + "/users/:id/unblock") {
+  post("/users/:id/unblock") {
     withId(params) { id =>
       val findUser = paidb.Tables.users.filter(_.id === id)
 
@@ -271,7 +265,7 @@ class UserServlet(
     }
   }
 
-  post(prefix + "/users/:id/reset-password") {
+  post("/users/:id/reset-password") {
     withId(params) { id =>
       val findUser = paidb.Tables.users.filter(_.id === id)
 

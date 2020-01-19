@@ -17,7 +17,7 @@ class ScalatraBootstrap extends LifeCycle {
   override def init(context: ServletContext) {
     val db = Database.forURL("jdbc:sqlite:user-management.db", driver="org.sqlite.JDBC")
     db.run(paidb.Tables.users.schema.create)
-    context.mount(new UserServlet(db), "/*")   // create and mount the Scalatra application
+    context.mount(new UserServlet(db), "/api/*")   // create and mount the Scalatra application
   }
 
   override def destroy(context: ServletContext) {
