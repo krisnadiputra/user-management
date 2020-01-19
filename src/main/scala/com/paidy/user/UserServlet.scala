@@ -184,13 +184,13 @@ class UserServlet(
   }
 
   delete("/users/:id") {
-    // try catch NotFound
-    val id = UserId(Integer.parseInt(params("id")))
-    val query = paidb.Tables.users.filter(_.id === id)
-    val action = query.delete
-    db.run(action).map(affectedRows => {
-      if (affectedRows > 0) Ok() else NotFound("User not found")
-    })
+    withId(params) { id => 
+      val query = paidb.Tables.users.filter(_.id === id)
+      val action = query.delete
+      db.run(action).map(affectedRows => {
+        if (affectedRows > 0) NoContent() else NotFound(Map("message" -> "User not found!"))
+      })
+    }
   }
 
   post("/users/signup") {
