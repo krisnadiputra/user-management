@@ -29,6 +29,7 @@ The API runs on [http://localhost:8080/](http://localhost:8080/). You can try it
 ## Endpoints ##
 
 The prefix for below endpoints is `/api/*`. Some of the endpoints require JSON format body for their parameters.
+
 Method | URI | Description | Body
 --- | --- | --- | ---
 GET | users/ | To get a list of all users
