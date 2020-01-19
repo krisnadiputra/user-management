@@ -236,23 +236,24 @@ class UserServlet(
   }
 
   post("/users/:id/block") {
-    val id = UserId(Integer.parseInt(params("id")))
-    val findUser = paidb.Tables.users.filter(_.id === id)
+    withId(params) { id =>
+      val findUser = paidb.Tables.users.filter(_.id === id)
 
-    val updated = for {
-      user <- db.run(findUser.result).map(_.headOption)
-    } yield {
-      user.map(_.block(OffsetDateTime.now))
-    }
-
-    updated.map(user =>
-      user.map(user => {
-        val query = paidb.Tables.users.filter(_.id === id).update(user)
-        db.run(query).map { _ => Ok(UserWithoutPW.from(user)) }
-      }) getOrElse {
-        Future(NotFound(Map("message" -> "User not found!")))
+      val updated = for {
+        user <- db.run(findUser.result).map(_.headOption)
+      } yield {
+        user.map(_.block(OffsetDateTime.now))
       }
-    )
+
+      updated.flatMap(user =>
+        user.map(user => {
+          val query = paidb.Tables.users.filter(_.id === id).update(user)
+          db.run(query).map { _ => Ok(UserWithoutPW.from(user)) }
+        }) getOrElse {
+          Future(NotFound(Map("message" -> "User not found!")))
+        }
+      )
+    }
   }
 
   post("/users/:id/unblock") {
